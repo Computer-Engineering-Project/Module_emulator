@@ -21,12 +21,17 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "string.h"
+#include "ring_buffer.h"
+#include "scheduler.h"
+#include "protocol.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
-
+#define BYTE_STOP		 0x23
+#define RF				 0 // RF
+#define NC				 1 // node controller
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -44,7 +49,48 @@ UART_HandleTypeDef huart1;
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
+// data receive from rf
+u8 idx1 = 0;
+u8 rf_rx_payload;
+u8 rf_rx_buf[LENGTH_RX_BUFFER] = {0};
+//
+l_data_t data_rx1[8];
+ring_buffer_t ring_buf_rf = {
+	.buffer = data_rx1,
+	.buffer_mask = 7,
+	.head_index = 0,
+	.tail_index = 0,
+};
+//data send to env
+u8 cur_mode = NORMAL;
+Packet_t rf_packet;
+u8 * rf_data;
+u8 rf_pklen;
+u8 rf_flg;
 
+// data receive from node controller
+u8 idx2 = 0;
+u8 nc_rx_payload;
+u8 nc_rx_buf[LENGTH_RX_BUFFER] = {0};
+
+//
+l_data_t data_rx2[8];
+ring_buffer_t ring_buf_nc = {
+	.buffer = data_rx2,
+	.buffer_mask = 7,
+	.head_index = 0,
+	.tail_index = 0,
+};
+// data send to node controller
+Packet_t nc_packet;
+u8 * nc_data;
+u8 nc_pklen;
+u8 nc_flg; // check data ready send
+
+// variable pin
+u8 M0;
+u8 M1;
+u8 AUX;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -58,7 +104,30 @@ static void MX_USART2_UART_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-
+void Process_Rx_RF(void)
+{
+	if(!ring_buffer_is_empty(&ring_buf_rf)){
+		data_buffer_t tmp;
+		ring_buffer_dequeue(&ring_buf_rf, &tmp);
+		nc_pklen = tmp.length;
+		// handle data received
+	}
+	return;
+}
+/* process data received from lora
+ * on flag send data processed to node controller
+ *
+ * */
+void Process_RX_Nc(void)
+{
+	if(!ring_buffer_is_empty(&ring_buf_nc)){
+		data_buffer_t tmp;
+		ring_buffer_dequeue(&ring_buf_nc, &tmp);
+		rf_pklen = tmp.length;
+		// handle data NC received
+	}
+	return;
+}
 /* USER CODE END 0 */
 
 /**
@@ -92,7 +161,12 @@ int main(void)
   MX_USART1_UART_Init();
   MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
-
+  char start1[]= "start RF!\n";
+  char start2[]= "start UART!\n";
+  HAL_UART_Transmit(&huart1, (uint8_t*)start1, 11, 1000);
+  HAL_UART_Transmit(&huart2, (uint8_t*)start2, 13, 1000);
+  HAL_UART_Receive_IT(&huart1, rf_rx_buf, 1);
+  HAL_UART_Receive_IT(&huart2, nc_rx_buf, 1);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -244,7 +318,41 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+{
+	if(huart->Instance == huart1.Instance)
+	 {
+	   HAL_UART_Receive_IT(&huart1, &rf_rx_payload, 1);
+	   rf_rx_buf[++idx1] = rf_rx_payload;
+	   if(rf_rx_payload == BYTE_STOP || idx1 == LENGTH_BUFFER){ //0x23 ='#'
+		   rf_rx_buf[0] = idx1++;
+		   ring_buffer_queue(&ring_buf_rf,  *( data_buffer_t *) (rf_rx_buf));
+		   idx1 = 0;
+	   }
+	 }
+	if(huart->Instance == huart2.Instance)
+	{
+		HAL_UART_Receive_IT(&huart2, &nc_rx_payload, 1);
+		nc_rx_buf[++idx2] = nc_rx_payload;
+		if(nc_rx_payload == BYTE_STOP || idx2 == LENGTH_BUFFER){ //0x23 ='#'
+			// reset index va copy buffer vao ring buffer
+			nc_rx_buf[0] = idx2++;
+			idx2 = 0;
+			ring_buffer_queue(&ring_buf_nc,  *( data_buffer_t *) (nc_rx_buf));
+		}
+	}
+}
 
+void readMode_Task()
+{
+	M0 = HAL_GPIO_ReadPin(GPIOA, M0_Pin);
+	M1 = HAL_GPIO_ReadPin(GPIOA, M1_Pin);
+	if(M0 == 0 && M1 == 0) cur_mode = NORMAL;
+	if(M0 == 0 && M1 == 1) cur_mode = WAKE_UP;
+	if(M0 == 1 && M1 == 0) cur_mode = POWER_SAVING;
+	if(M0 == 1 && M1 == 1) cur_mode = SLEEP;
+	//Lora_Change_Mode();
+}
 /* USER CODE END 4 */
 
 /**

@@ -11,7 +11,7 @@
 #ifndef APPS_USER_RING_BUFFER_H_
 #define APPS_USER_RING_BUFFER_H_
 
-#define LENGTH_BUFFER		128
+#define LENGTH_BUFFER		256
 
 /**
  * The type which is used to hold the size

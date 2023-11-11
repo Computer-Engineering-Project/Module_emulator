@@ -1,0 +1,11 @@
+../Core/Src/main.c:107:6:Process_Rx_RF	272	static
+../Core/Src/main.c:121:6:Process_RX_Nc	272	static
+../Core/Src/main.c:137:5:main	48	static
+../Core/Src/main.c:187:6:SystemClock_Config	72	static
+../Core/Src/main.c:224:13:MX_USART1_UART_Init	8	static
+../Core/Src/main.c:257:13:MX_USART2_UART_Init	8	static
+../Core/Src/main.c:290:13:MX_GPIO_Init	32	static
+../Core/Src/main.c:321:6:HAL_UART_RxCpltCallback	280	static
+../Core/Src/main.c:346:6:readMode_Task	8	static
+../Core/Src/main.c:366:6:HAL_TIM_PeriodElapsedCallback	16	static
+../Core/Src/main.c:383:6:Error_Handler	4	static,ignoring_inline_asm
