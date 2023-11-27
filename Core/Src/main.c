@@ -25,11 +25,12 @@
 #include "ring_buffer.h"
 #include "scheduler.h"
 #include "protocol.h"
+#include "type.h"
+#include "service.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
-#define BYTE_STOP		 0x23
 #define RF				 0 // RF
 #define NC				 1 // node controller
 /* USER CODE END PTD */
@@ -41,6 +42,7 @@
 
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
+__TYPE_CONFIG MODULE_CONFIG;
 
 /* USER CODE END PM */
 
@@ -53,44 +55,37 @@ UART_HandleTypeDef huart2;
 u8 idx1 = 0;
 u8 rf_rx_payload;
 u8 rf_rx_buf[LENGTH_RX_BUFFER] = {0};
-//
-l_data_t data_rx1[8];
+Packet_t data_rx1[8];
 ring_buffer_t ring_buf_rf = {
 	.buffer = data_rx1,
 	.buffer_mask = 7,
 	.head_index = 0,
 	.tail_index = 0,
 };
-//data send to env
-u8 cur_mode = NORMAL;
-Packet_t rf_packet;
-u8 * rf_data;
-u8 rf_pklen;
-u8 rf_flg;
 
 // data receive from node controller
 u8 idx2 = 0;
 u8 nc_rx_payload;
-u8 nc_rx_buf[LENGTH_RX_BUFFER] = {0};
-
-//
-l_data_t data_rx2[8];
+Packet_t nc_rx_buf;
+Packet_t data_rx2[8];
 ring_buffer_t ring_buf_nc = {
 	.buffer = data_rx2,
 	.buffer_mask = 7,
 	.head_index = 0,
 	.tail_index = 0,
 };
-// data send to node controller
-Packet_t nc_packet;
-u8 * nc_data;
-u8 nc_pklen;
-u8 nc_flg; // check data ready send
+
 
 // variable pin
 u8 M0;
 u8 M1;
 u8 AUX;
+
+u8 cur_mode = NORMAL;
+u8 pre_mode = NORMAL;
+u8 test = 0;
+u8 start1 = false;
+u8 start2 = false;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -99,6 +94,9 @@ static void MX_GPIO_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_USART2_UART_Init(void);
 /* USER CODE BEGIN PFP */
+void User_Init(void);
+void readMode_Task();
+void fakeData();
 
 /* USER CODE END PFP */
 
@@ -107,9 +105,28 @@ static void MX_USART2_UART_Init(void);
 void Process_Rx_RF(void)
 {
 	if(!ring_buffer_is_empty(&ring_buf_rf)){
-		data_buffer_t tmp;
+		Packet_t tmp;
 		ring_buffer_dequeue(&ring_buf_rf, &tmp);
-		nc_pklen = tmp.length;
+		switch(tmp.cmdWord)
+		{
+		case CONNECT: // blink led 3 s
+			processConnect(tmp);
+			break;
+		case READ_CONFIG:
+			processReadConfig(tmp);
+			break;
+		case CONFIG:
+			processConfig(tmp);
+			break;
+		case CHANGE_MODE:
+			processSendDataRF(tmp);
+			break;
+		case SEND_DATA:
+			processSendDataNC(tmp);
+			break;
+		default:
+			break;
+		}
 		// handle data received
 	}
 	return;
@@ -121,10 +138,9 @@ void Process_Rx_RF(void)
 void Process_RX_Nc(void)
 {
 	if(!ring_buffer_is_empty(&ring_buf_nc)){
-		data_buffer_t tmp;
+		Packet_t tmp;
 		ring_buffer_dequeue(&ring_buf_nc, &tmp);
-		rf_pklen = tmp.length;
-		// handle data NC received
+		processSendDataRF(tmp);
 	}
 	return;
 }
@@ -146,7 +162,7 @@ int main(void)
   HAL_Init();
 
   /* USER CODE BEGIN Init */
-
+  User_Init();
   /* USER CODE END Init */
 
   /* Configure the system clock */
@@ -161,18 +177,27 @@ int main(void)
   MX_USART1_UART_Init();
   MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
+//  if(MODULE_CONFIG.baudrate != huart2.Init.BaudRate)
+//  {
+//	  Uart_SetBaudrate(MODULE_CONFIG.baudrate);
+//  }
   char start1[]= "start RF!\n";
   char start2[]= "start UART!\n";
   HAL_UART_Transmit(&huart1, (uint8_t*)start1, 11, 1000);
   HAL_UART_Transmit(&huart2, (uint8_t*)start2, 13, 1000);
-  HAL_UART_Receive_IT(&huart1, rf_rx_buf, 1);
-  HAL_UART_Receive_IT(&huart2, nc_rx_buf, 1);
+  HAL_UART_Receive_IT(&huart1, &rf_rx_payload, 1);
+  HAL_UART_Receive_IT(&huart2, &nc_rx_payload, 1);
+//  test = HAL_GPIO_ReadPin(TEST_GPIO_Port, TEST_Pin);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+	  readMode_Task();
+	  Process_Rx_RF();
+	  Process_RX_Nc();
+//	  fakeData();
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -294,11 +319,23 @@ static void MX_GPIO_Init(void)
 /* USER CODE END MX_GPIO_Init_1 */
 
   /* GPIO Ports Clock Enable */
+  __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOD_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
+  __HAL_RCC_GPIOB_CLK_ENABLE();
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(LED_PIN_GPIO_Port, LED_PIN_Pin, GPIO_PIN_SET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(AUX_GPIO_Port, AUX_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin : LED_PIN_Pin */
+  GPIO_InitStruct.Pin = LED_PIN_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(LED_PIN_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pins : M0_Pin M1_Pin */
   GPIO_InitStruct.Pin = M0_Pin|M1_Pin;
@@ -313,32 +350,49 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(AUX_GPIO_Port, &GPIO_InitStruct);
 
+  /*Configure GPIO pin : TEST_Pin */
+  GPIO_InitStruct.Pin = TEST_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(TEST_GPIO_Port, &GPIO_InitStruct);
+
 /* USER CODE BEGIN MX_GPIO_Init_2 */
 /* USER CODE END MX_GPIO_Init_2 */
 }
 
 /* USER CODE BEGIN 4 */
+void User_Init(void)
+{
+	FLASH_read();
+	nc_rx_buf.cmdWord = SEND_DATA;
+	nc_rx_buf.module = MODULE_CONFIG.type;
+}
+
+
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
+	HAL_UART_Receive_IT(&huart1, &rf_rx_payload, 1);
+	HAL_UART_Receive_IT(&huart2, &nc_rx_payload, 1);
 	if(huart->Instance == huart1.Instance)
 	 {
-	   HAL_UART_Receive_IT(&huart1, &rf_rx_payload, 1);
-	   rf_rx_buf[++idx1] = rf_rx_payload;
+//	   HAL_UART_Receive_IT(&huart1, &rf_rx_payload, 1);
+	   rf_rx_buf[idx1++] = rf_rx_payload;
 	   if(rf_rx_payload == BYTE_STOP || idx1 == LENGTH_BUFFER){ //0x23 ='#'
-		   rf_rx_buf[0] = idx1++;
-		   ring_buffer_queue(&ring_buf_rf,  *( data_buffer_t *) (rf_rx_buf));
+		   ring_buffer_queue(&ring_buf_rf,  *( Packet_t *) (rf_rx_buf));
 		   idx1 = 0;
 	   }
 	 }
 	if(huart->Instance == huart2.Instance)
 	{
-		HAL_UART_Receive_IT(&huart2, &nc_rx_payload, 1);
-		nc_rx_buf[++idx2] = nc_rx_payload;
+//		HAL_UART_Receive_IT(&huart2, &nc_rx_payload, 1);
+		nc_rx_buf.data[idx2++] = nc_rx_payload;
 		if(nc_rx_payload == BYTE_STOP || idx2 == LENGTH_BUFFER){ //0x23 ='#'
 			// reset index va copy buffer vao ring buffer
-			nc_rx_buf[0] = idx2++;
+			nc_rx_buf.module = MODULE_CONFIG.type;
+			nc_rx_buf.cmdWord = SEND_DATA;
+			nc_rx_buf.dataLength = idx2;
 			idx2 = 0;
-			ring_buffer_queue(&ring_buf_nc,  *( data_buffer_t *) (nc_rx_buf));
+			ring_buffer_queue(&ring_buf_nc,  nc_rx_buf);
 		}
 	}
 }
@@ -347,11 +401,36 @@ void readMode_Task()
 {
 	M0 = HAL_GPIO_ReadPin(GPIOA, M0_Pin);
 	M1 = HAL_GPIO_ReadPin(GPIOA, M1_Pin);
+
 	if(M0 == 0 && M1 == 0) cur_mode = NORMAL;
 	if(M0 == 0 && M1 == 1) cur_mode = WAKE_UP;
 	if(M0 == 1 && M1 == 0) cur_mode = POWER_SAVING;
 	if(M0 == 1 && M1 == 1) cur_mode = SLEEP;
-	//Lora_Change_Mode();
+
+	if(pre_mode != cur_mode)
+	{
+		Packet_t packet = processChangeMode();
+		ring_buffer_queue(&ring_buf_rf, packet);
+		pre_mode = cur_mode;
+	}
+}
+void fakeData()
+{
+	u8 tmp = test;
+	test = HAL_GPIO_ReadPin(TEST_GPIO_Port, TEST_Pin);
+	if(test != tmp)
+	{
+		Packet_t tmp;
+		tmp.cmdWord = SEND_DATA;
+		tmp.module = MODULE_CONFIG.type;
+		tmp.dataLength = 3;
+		tmp.data[0] = 0x01;
+		tmp.data[1] = 0x02;
+		tmp.data[2] = 0x03;
+		tmp.data[3] = 0x23;
+		processSendDataRF(tmp);
+	}
+
 }
 /* USER CODE END 4 */
 

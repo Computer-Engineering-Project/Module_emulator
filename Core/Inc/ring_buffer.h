@@ -6,6 +6,7 @@
  */
 #include "type.h"
 #include "stddef.h"
+#include "protocol.h"
 //#include "fl.h"
 
 #ifndef APPS_USER_RING_BUFFER_H_
@@ -26,21 +27,8 @@ typedef unsigned int ring_buffer_size_t;
  * \c b is the (power of two) size of the buffer.
  */
 #define RING_BUFFER_MASK(rb) (rb->buffer_mask)
-typedef struct l_data {
-	u8 length;
-	char arr[LENGTH_BUFFER];
-} l_data_t;
 
-typedef l_data_t data_buffer_t;
-//struct data_buffer_t{
-//
-//};
-
-/**
- * Simplifies the use of <tt>struct ring_buffer_t</tt>.
- */
-// struct ring_buffer ring_buffer_t;
-
+typedef Packet_t data_buffer_t;
 
 /**
  * Structure which holds a ring buffer.

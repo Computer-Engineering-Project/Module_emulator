@@ -1,6 +1,6 @@
-ring_buffer.h:117:11:ring_buffer_is_empty	1
-ring_buffer.h:126:11:ring_buffer_is_full	1
-ring_buffer.h:135:27:ring_buffer_num_items	1
+ring_buffer.h:105:11:ring_buffer_is_empty	1
+ring_buffer.h:114:11:ring_buffer_is_full	1
+ring_buffer.h:123:27:ring_buffer_num_items	1
 ring_buffer.c:14:6:ring_buffer_init	1
 ring_buffer.c:22:6:ring_buffer_queue	2
 ring_buffer.c:35:6:ring_buffer_queue_arr	2

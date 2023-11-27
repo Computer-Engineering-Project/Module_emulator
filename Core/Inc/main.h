@@ -36,7 +36,11 @@ extern "C" {
 
 /* Exported types ------------------------------------------------------------*/
 /* USER CODE BEGIN ET */
-
+typedef struct {
+	uint8_t type;
+	uint8_t id;
+	uint8_t baudrate;
+}__TYPE_CONFIG;
 /* USER CODE END ET */
 
 /* Exported constants --------------------------------------------------------*/
@@ -57,12 +61,16 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
+#define LED_PIN_Pin GPIO_PIN_13
+#define LED_PIN_GPIO_Port GPIOC
 #define M0_Pin GPIO_PIN_5
 #define M0_GPIO_Port GPIOA
 #define M1_Pin GPIO_PIN_6
 #define M1_GPIO_Port GPIOA
 #define AUX_Pin GPIO_PIN_7
 #define AUX_GPIO_Port GPIOA
+#define TEST_Pin GPIO_PIN_7
+#define TEST_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */
 

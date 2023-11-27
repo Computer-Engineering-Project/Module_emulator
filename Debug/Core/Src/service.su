@@ -1,0 +1,10 @@
+../Core/Src/service.c:20:6:FLASH_read	4	static
+../Core/Src/service.c:25:6:FLASH_write	40	static
+../Core/Src/service.c:46:6:processConnect	16	static
+../Core/Src/service.c:57:6:processReadConfig	8	static
+../Core/Src/service.c:67:6:processConfig	8	static
+../Core/Src/service.c:77:10:processChangeMode	280	static
+../Core/Src/service.c:88:6:processSendDataRF	8	static
+../Core/Src/service.c:93:6:processSendDataNC	8	static
+../Core/Src/service.c:98:10:Match_Baudrate	16	static
+../Core/Src/service.c:125:6:Uart_SetBaudrate	24	static

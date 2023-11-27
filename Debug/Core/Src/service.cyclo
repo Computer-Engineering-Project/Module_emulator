@@ -1,0 +1,10 @@
+service.c:20:6:FLASH_read	1
+service.c:25:6:FLASH_write	3
+service.c:46:6:processConnect	2
+service.c:57:6:processReadConfig	1
+service.c:67:6:processConfig	1
+service.c:77:10:processChangeMode	1
+service.c:88:6:processSendDataRF	1
+service.c:93:6:processSendDataNC	1
+service.c:98:10:Match_Baudrate	10
+service.c:125:6:Uart_SetBaudrate	3

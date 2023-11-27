@@ -24,12 +24,26 @@ enum LORA_MODE {
 	INIT = 3,
 };
 
+enum DEVICE_TYPE {
+	LORA = 0x01,
+	ZIGBEE = 0x02,
+};
+
+enum CMD {
+	CONNECT = 0x00,
+	READ_CONFIG = 0x01,
+	CONFIG = 0x02,
+	CHANGE_MODE = 0x03,
+	SEND_DATA = 0x04,
+};
+
 typedef struct LoraPacket{
 	u8 module;
 	u8 cmdWord;
 	u16 dataLength;
 	u8 data[LENGTH_RX_BUFFER];
-	u8 endbyte;
 }Packet_t;
+
+
 
 #endif /* INC_PROTOCOL_H_ */
